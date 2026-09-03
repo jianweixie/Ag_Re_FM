@@ -1,0 +1,697 @@
+<meta charset="utf-8">
+<title>Ag-Re-FM — County Yield &amp; Loss Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Core Specialty palette, sampled from corespecialty.com:
+     brand red #DA291C, secondary orange #FF6A14, near-black #231F20,
+     Montserrat throughout. */
+  :root{
+    --brand:#DA291C; --brand2:#FF6A14; --ink0:#231F20;
+    --bg:#f4f5f7; --panel:#fff; --ink:#231F20; --muted:#63676b; --line:#dcdee1;
+    --accent:var(--brand); --pos:#1f7a4d; --neg:#DA291C;
+    --shadow:0 1px 3px rgba(35,31,32,.08),0 1px 2px rgba(35,31,32,.04);
+    --headerbg:#231F20; --headerink:#fff;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme=light]){
+      --bg:#131416; --panel:#1c1e21; --ink:#f0f1f2; --muted:#9ba1a7; --line:#31353a;
+      --pos:#4fbf85; --neg:#ff5c4d;
+      --shadow:0 1px 3px rgba(0,0,0,.5);
+      --headerbg:#000; --headerink:#fff;
+    }
+  }
+  :root[data-theme=dark]{
+    --bg:#131416; --panel:#1c1e21; --ink:#f0f1f2; --muted:#9ba1a7; --line:#31353a;
+    --pos:#4fbf85; --neg:#ff5c4d;
+    --shadow:0 1px 3px rgba(0,0,0,.5); --headerbg:#000; --headerink:#fff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.55 Montserrat,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  header{background:var(--headerbg);color:var(--headerink);padding:14px 20px;
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  header .mark{flex:0 0 auto}
+  h1{margin:0;font-size:16px;font-weight:600;letter-spacing:-.01em}
+  .sub{color:rgba(255,255,255,.62);font-size:12px;margin-top:1px}
+  .spacer{flex:1}
+  .themebtn{background:transparent;color:var(--headerink);
+    border:1px solid rgba(255,255,255,.28);border-radius:999px;padding:5px 13px;
+    font:inherit;font-size:12px;cursor:pointer}
+  .themebtn:hover{border-color:var(--brand)}
+  .wrap{max-width:1560px;margin:0 auto;padding:18px 20px 60px}
+  .bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:14px 0}
+  label{font-size:12px;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+  select,button,input{font:inherit;font-size:13px;color:var(--ink);background:var(--panel);
+    border:1px solid var(--line);border-radius:6px;padding:6px 10px}
+  select:focus,input:focus{outline:2px solid var(--brand);outline-offset:1px}
+  button{cursor:pointer}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:10px;margin:14px 0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:11px 13px;box-shadow:var(--shadow);border-top:3px solid var(--brand)}
+  .card.plain{border-top-color:var(--line)}
+  .card .k{color:var(--muted);font-size:10.5px;text-transform:uppercase;
+    letter-spacing:.07em;font-weight:600}
+  .card .v{font-size:22px;font-weight:600;margin-top:3px;font-variant-numeric:tabular-nums}
+  .card .n{color:var(--muted);font-size:11.5px;margin-top:2px;line-height:1.35}
+  .grid{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;align-items:start}
+  @media(max-width:1080px){.grid{grid-template-columns:1fr}}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:14px;box-shadow:var(--shadow)}
+  .panel h2{margin:0 0 10px;font-size:11.5px;text-transform:uppercase;
+    letter-spacing:.08em;color:var(--muted);font-weight:600}
+  svg.map{display:block;width:100%;height:auto;background:transparent}
+  .cty{stroke:var(--panel);stroke-width:.4;cursor:pointer;transition:opacity .1s}
+  .cty:hover{stroke:var(--ink);stroke-width:1.3}
+  .stateline{fill:none;stroke:var(--ink);stroke-width:1.9;stroke-linejoin:round;
+    pointer-events:none;opacity:.85}
+  .tblwrap{max-height:440px;overflow:auto;border:1px solid var(--line);border-radius:6px}
+  table{border-collapse:collapse;width:100%;font-size:12.5px}
+  th,td{padding:6px 9px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+  th:first-child,td:first-child{text-align:left}
+  th{position:sticky;top:0;background:var(--panel);cursor:pointer;font-weight:600;
+    font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  tbody tr:hover{background:rgba(218,41,28,.06)}
+  td.num{font-variant-numeric:tabular-nums}
+  .legend{display:flex;gap:2px;align-items:center;margin-top:8px;font-size:11px;color:var(--muted)}
+  .legend i{width:26px;height:9px;display:block}
+  .tip{position:fixed;pointer-events:none;background:var(--panel);border:1px solid var(--line);
+    border-left:3px solid var(--brand);border-radius:6px;padding:7px 10px;font-size:12px;
+    box-shadow:var(--shadow);opacity:0;transition:opacity .1s;z-index:20;max-width:270px}
+  .note{color:var(--muted);font-size:12px;margin-top:9px;line-height:1.55}
+  .drop{border:2px dashed var(--line);border-radius:10px;padding:40px 22px;text-align:center;
+    color:var(--muted);background:var(--panel)}
+  .drop.hot{border-color:var(--brand);color:var(--ink)}
+  .warn{background:rgba(218,41,28,.09);border:1px solid var(--brand);color:var(--ink);
+    padding:9px 12px;border-radius:6px;font-size:12.5px;margin:10px 0}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+  .pill{display:inline-block;padding:1px 7px;border-radius:999px;font-size:10.5px;
+    border:1px solid var(--line);color:var(--muted);margin-left:6px;letter-spacing:.03em}
+</style>
+
+<header>
+  <span class="mark" aria-hidden="true">
+    <svg width="34" height="34" viewBox="0 0 64 64" role="img">
+      <path fill="#DA291C" d="M0 0.572L0 63.893 63.284 63.893 63.284 55.979 7.911 55.979 7.911 8.487 63.284 8.487 63.284 0.572z"/>
+      <path fill="#FF6A14" d="M63.284 22.338L63.284 14.423 13.844 14.423 13.844 36.19 55.373 36.19 55.373 42.127 13.844 42.127 13.844 50.042 63.284 50.042 63.284 28.275 21.754 28.275 21.754 22.338z"/>
+    </svg>
+  </span>
+  <div>
+    <h1>Ag-Re-FM — county yield &amp; loss</h1>
+    <div class="sub">Core Specialty · MPCI loss-ratio and reinsurance analytics</div>
+  </div>
+  <div class="spacer"></div>
+  <button class="themebtn" id="theme">Theme: auto</button>
+</header>
+
+<div class="wrap">
+  <div id="loader" class="drop">
+    <p style="margin:0 0 12px"><strong>Drop <code>model_all_crops.json</code> here</strong>, or choose the file.</p>
+    <input type="file" id="file" accept=".json">
+    <p class="note" style="margin-top:14px">Built by
+      <code>python -m agrefm combine --crops CORN,SOYBEANS</code>. Everything runs locally;
+      nothing is uploaded.</p>
+  </div>
+
+  <div id="app" hidden>
+    <div class="bar">
+      <label>Crop <select id="crop"></select></label>
+      <label>Scope <select id="scope"></select></label>
+      <label>Season <select id="year"></select></label>
+      <label>Map <select id="mode">
+        <option value="yield">Predicted yield</option>
+        <option value="anom">Anomaly vs trend</option>
+        <option value="margin">Margin vs guarantee</option>
+        <option value="acres">Harvested acres</option>
+      </select></label>
+      <label>Coverage <select id="cov">
+        <option>0.70</option><option>0.75</option><option selected>0.80</option>
+        <option>0.85</option><option>0.90</option><option>0.95</option>
+      </select></label>
+    </div>
+
+    <div id="banner"></div>
+    <div class="cards" id="cards"></div>
+
+    <div class="grid">
+      <div class="panel">
+        <h2>Counties <span id="mapTitle" class="pill"></span></h2>
+        <svg class="map" id="map" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="legend" id="legend"></div>
+        <div class="note" id="mapNote"></div>
+      </div>
+      <div class="panel">
+        <h2>Per-state summary</h2>
+        <div class="tblwrap"><table id="stateTbl"></table></div>
+        <div class="note"><strong>Model 2026</strong> is this pipeline's in-season
+          county forecast, acre-weighted and calibrated to the published basis.
+          <strong>NASS</strong> is USDA's own state forecast for the same season, from the
+          most recent Crop Production report. They are independent estimates of the same
+          quantity, so the Diff column is a genuine out-of-sample check rather than a
+          fit statistic — but note NASS revises monthly, so it is a moving target, not
+          truth.</div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:16px">
+      <h2>County detail</h2>
+      <div class="bar" style="margin:0 0 10px">
+        <input id="search" placeholder="Filter county or FIPS…" style="min-width:220px">
+        <span class="note" id="rowCount" style="margin:0"></span>
+      </div>
+      <div class="tblwrap"><table id="ctyTbl"></table></div>
+    </div>
+
+    <div class="grid" style="margin-top:16px">
+      <div class="panel">
+        <h2>Model card</h2>
+        <div class="tblwrap" style="max-height:330px"><table id="coefTbl"></table></div>
+        <div class="note" id="modelNote"></div>
+      </div>
+      <div class="panel">
+        <h2>Loss cost</h2>
+        <div id="loss"></div>
+        <div class="note">Guarantee is <code>coverage × trend yield</code>. At 0.90 and 0.95
+          the calculation switches to the ECO band, which pays from the trigger down to 86%
+          of expected rather than to zero.</div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="tip" id="tip"></div>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+let DOC = null, GEO = null;
+
+/* ---------- theme ---------- */
+const themes = ["auto","light","dark"];
+let themeIdx = 0;
+$("#theme").addEventListener("click", () => {
+  themeIdx = (themeIdx + 1) % 3;
+  const t = themes[themeIdx];
+  if(t === "auto") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.setAttribute("data-theme", t);
+  $("#theme").textContent = "Theme: " + t;
+  try{ localStorage.setItem("agrefm-theme", t); }catch(e){}
+  if(DOC) render();
+});
+try{
+  const saved = localStorage.getItem("agrefm-theme");
+  if(saved && themes.includes(saved)){
+    themeIdx = themes.indexOf(saved);
+    if(saved !== "auto") document.documentElement.setAttribute("data-theme", saved);
+    $("#theme").textContent = "Theme: " + saved;
+  }
+}catch(e){}
+
+/* ---------- load ---------- */
+function boot(text){
+  let d;
+  try{ d = JSON.parse(text); }
+  catch(e){ alert("Not valid JSON: " + e.message); return; }
+  if(!d.crops){ alert("No 'crops' key — is this a combined export?"); return; }
+  DOC = d; GEO = d.geometry || null;
+  _msfCache.clear();   // a new file invalidates every cached state figure
+  const crop = $("#crop"); crop.innerHTML = "";
+  Object.entries(d.crops).forEach(([k,v]) => crop.append(new Option(v.label||k, k)));
+  $("#loader").hidden = true; $("#app").hidden = false;
+  onCrop();
+}
+$("#file").addEventListener("change", e => {
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader(); r.onload = () => boot(r.result); r.readAsText(f);
+});
+const drop = $("#loader");
+["dragenter","dragover"].forEach(t => drop.addEventListener(t, e => {
+  e.preventDefault(); drop.classList.add("hot"); }));
+["dragleave","drop"].forEach(t => drop.addEventListener(t, e => {
+  e.preventDefault(); drop.classList.remove("hot"); }));
+drop.addEventListener("drop", e => {
+  const f = e.dataTransfer.files[0]; if(!f) return;
+  const r = new FileReader(); r.onload = () => boot(r.result); r.readAsText(f);
+});
+
+/* ---------- selection ---------- */
+const cropKey = () => $("#crop").value;
+const cropBlock = () => DOC.crops[cropKey()];
+const scopeKey = () => $("#scope").value;
+const statesOf = () => Object.keys(cropBlock().states);
+const modelsInScope = () => scopeKey() === "__ALL__"
+  ? statesOf().map(s => cropBlock().states[s]) : [cropBlock().states[scopeKey()]];
+
+function onCrop(){
+  const sc = $("#scope"); sc.innerHTML = "";
+  sc.append(new Option("All states", "__ALL__"));
+  statesOf().forEach(s => sc.append(new Option(cropBlock().states[s].state_name, s)));
+  const yr = $("#year"); yr.innerHTML = "";
+  const yrs = new Set();
+  statesOf().forEach(s =>
+    Object.keys(cropBlock().states[s].year_shift||{}).forEach(y => yrs.add(y)));
+  [...yrs].sort().reverse().forEach(y => yr.append(new Option(y, y)));
+  const anyCur = statesOf().some(s => cropBlock().states[s].current_season);
+  if(anyCur){
+    const cs = cropBlock().states[statesOf().find(s => cropBlock().states[s].current_season)]
+                 .current_season;
+    yr.prepend(new Option(`${cs.year} — in season`, "__CUR__"));
+  }
+  yr.selectedIndex = 0;
+  render();
+}
+$("#crop").addEventListener("change", onCrop);
+["#scope","#year","#mode","#cov","#search"].forEach(s =>
+  $(s).addEventListener(s === "#search" ? "input" : "change", render));
+
+/* ---------- scoring ----------
+   Two genuinely different paths, and conflating them was a real bug:
+
+   HISTORICAL season -> the full-season model. Feature values are reconstructed as
+     countyBaseline_f + yearShift_f * featureSd_f, because the export carries county
+     means and per-season shifts in SD units rather than every raw county-year.
+
+   IN-SEASON -> the current_season block, which is a SEPARATE model refit on features
+     truncated at the as-of day, and carries genuinely OBSERVED values per county.
+     year_shift has no entry for the in-season year, so scoring it through the
+     historical path silently applied a zero shift and returned a long-run-normal
+     yield while the label said "in season".                                        */
+function scoreCounty(m, c, yearKey){
+  const cs = m.current_season;
+  if(yearKey === "__CUR__"){
+    if(!cs || !cs.observed || !cs.observed[c.fips]) return null;
+    const obs = cs.observed[c.fips];
+    const trend = c.alpha + m.beta * (cs.year - m.trend_ref);
+    let z = cs.intercept;
+    const q = cs.quantile_coef || {};
+    let z10 = q.q10 ? q.q10.intercept : null, z90 = q.q90 ? q.q90.intercept : null;
+    for(const f of cs.features){
+      const x = obs[f];
+      if(x === undefined || x === null) return null;
+      const s = (x - cs.scaler_mean[f]) / (cs.scaler_scale[f] || 1);
+      z += (cs.coef[f]||0) * s;
+      if(z10 !== null) z10 += (q.q10.coef[f]||0) * s;
+      if(z90 !== null) z90 += (q.q90.coef[f]||0) * s;
+    }
+    let q10 = z10 !== null ? trend + z10 : null, q90 = z90 !== null ? trend + z90 : null;
+    if(q10 !== null && q10 > q90){ const t = q10; q10 = q90; q90 = t; }
+    return {fips:c.fips, name:c.name, acres:c.acres, nYears:c.n_years,
+            trend, pred:trend + z, anom:z, q10, q90, year:cs.year, inSeason:true};
+  }
+  const yr = +yearKey;
+  const shift = (m.year_shift||{})[String(yr)] || {};
+  const trend = c.alpha + m.beta * (yr - m.trend_ref);
+  let z = m.intercept;
+  const qc = m.quantile_coef || {};
+  let z10 = qc.q10 ? qc.q10.intercept : null, z90 = qc.q90 ? qc.q90.intercept : null;
+  for(const f of m.features){
+    const base = c.baseline ? c.baseline[f] : null;
+    if(base === null || base === undefined) return null;
+    const x = base + (shift[f]||0) * (m.feature_sd[f]||0);
+    const s = (x - m.scaler_mean[f]) / (m.scaler_scale[f]||1);
+    z += (m.coef[f]||0) * s;
+    if(z10 !== null) z10 += (qc.q10.coef[f]||0) * s;
+    if(z90 !== null) z90 += (qc.q90.coef[f]||0) * s;
+  }
+  let q10 = z10 !== null ? trend + z10 : null, q90 = z90 !== null ? trend + z90 : null;
+  if(q10 !== null && q10 > q90){ const t = q10; q10 = q90; q90 = t; }
+  return {fips:c.fips, name:c.name, acres:c.acres, nYears:c.n_years,
+          trend, pred:trend + z, anom:z, q10, q90, year:yr, inSeason:false};
+}
+function rowsInScope(){
+  const yk = $("#year").value, out = [];
+  for(const m of modelsInScope())
+    for(const c of m.counties){
+      const r = scoreCounty(m, c, yk);
+      if(r){ r.state = m.state; r.stateName = m.state_name;
+             r.cal = (m.state_calibration||{}).ratio || 1; out.push(r); }
+    }
+  return out;
+}
+/* Acre-weighted, then multiplied by the published/county-aggregate calibration
+   ratio. This is how a state figure is built everywhere else in this package.
+   An unweighted county mean is a DIFFERENT QUANTITY and runs several bu/ac low,
+   because it lets a 5,000-acre county count as much as a 200,000-acre one. */
+function stateFigure(rows){
+  if(!rows.length) return {wtd:NaN, plain:NaN, cal:1};
+  let num = 0, den = 0, calNum = 0;
+  for(const r of rows){ const w = r.acres || 0; num += r.pred*w; den += w; calNum += (r.cal||1)*w; }
+  const plain = rows.reduce((a,r)=>a+r.pred,0)/rows.length;
+  if(den <= 0) return {wtd:plain, plain, cal:1};
+  const cal = calNum/den;
+  return {wtd:(num/den)*cal, plain, cal, raw:num/den};
+}
+
+/* ---------- colour ---------- */
+const RAMP = ["#7f1d16","#b8362a","#dd7a63","#f0cbc0","#e3e6e8","#9dc6b0","#4f9d76","#1f7a4d"];
+function scaleFor(vals){
+  const v = vals.filter(Number.isFinite).sort((a,b)=>a-b);
+  if(!v.length) return null;
+  const q = p => v[Math.min(v.length-1, Math.floor(p*(v.length-1)))];
+  return {lo:q(.02), hi:q(.98)};
+}
+function colour(x, sc, div){
+  if(!Number.isFinite(x) || !sc) return "rgba(127,127,127,.16)";
+  let t = (x - sc.lo)/((sc.hi - sc.lo)||1);
+  t = Math.max(0, Math.min(1, t));
+  if(div){ const mid = (0 - sc.lo)/((sc.hi - sc.lo)||1);
+    t = x < 0 ? .5*t/Math.max(mid,1e-6) : .5 + .5*(t-mid)/Math.max(1-mid,1e-6);
+    t = Math.max(0, Math.min(1, t)); }
+  return RAMP[Math.round(t*(RAMP.length-1))];
+}
+
+/* ---------- render ---------- */
+function render(){
+  if(!DOC) return;
+  const rows = rowsInScope(), cov = parseFloat($("#cov").value), mode = $("#mode").value;
+  rows.forEach(r => { r.guarantee = cov*r.trend; r.margin = r.pred - r.guarantee; });
+  cards(rows); stateTable(); map(rows, mode); countyTable(rows); modelCard(); loss(rows, cov);
+}
+
+function cards(rows){
+  const ms = modelsInScope(), one = ms.length === 1;
+  const f = stateFigure(rows);
+  const rmse = ms.reduce((a,m)=>a+(m.cv_rmse||0),0)/ms.length;
+  const cvg  = ms.reduce((a,m)=>a+(m.cv_coverage_80||0),0)/ms.length;
+  const inS = rows.length && rows[0].inSeason;
+  /* "In-season" is only honest while the season is still open. Winter wheat is
+     harvested in July, so by the August as-of date its season has CLOSED even
+     though the calendar year has not, and calling that provisional overstates
+     it. The exporter measures this against the resolved season end rather than
+     hardcoding a crop. */
+  const done = inS && ms.length && ms.every(m => m.current_season
+                                             && m.current_season.season_complete);
+  const seasonNote = inS ? (done ? " · full season scored" : " · in-season model") : "";
+  const unit = cropBlock().unit;
+  const put = (k,v,n,plain) => `<div class="card${plain?" plain":""}">
+      <div class="k">${k}</div><div class="v">${v}</div><div class="n">${n||""}</div></div>`;
+
+  /* NASS's own in-season forecast for the same season, acre-weighted across the
+     states in scope so it is comparable with the model figure beside it. Only
+     shown for the in-season option -- against a historical season the published
+     final yield is the right comparison, and that is already in the chart. */
+  let nassCard = "";
+  if(inS){
+    let num = 0, den = 0, rep = null, n = 0;
+    for(const m of ms){
+      const fc = m.nass_forecast;
+      if(!fc || fc.yield_bu == null) continue;
+      const ac = (m.counties||[]).reduce((a,c)=>a+(c.acres||0), 0);
+      num += fc.yield_bu * (ac || 1); den += (ac || 1); n++;
+      rep = rep || (fc.load_time||"").slice(0,10);
+    }
+    if(n){
+      const nassV = num/den, gap = f.wtd - nassV;
+      nassCard =
+        put("NASS forecast", nassV.toFixed(1),
+            `${unit} · ${n===1?"published":"acre-wtd over "+n+" states"}` +
+            (rep?` · ${rep} report`:"")) +
+        put("Model − NASS", (gap>0?"+":"")+gap.toFixed(1),
+            gap > 0 ? "model reads high" : "model reads low", true);
+    }
+  }
+
+  $("#cards").innerHTML =
+    put(one ? "State yield" : "Footprint yield", Number.isFinite(f.wtd)?f.wtd.toFixed(1):"—",
+        `${unit} · acre-weighted × ${f.cal.toFixed(4)} calibration`) +
+    nassCard +
+    put("Unweighted county mean", Number.isFinite(f.plain)?f.plain.toFixed(1):"—",
+        "a different quantity — runs low", true) +
+    put("Counties", rows.length, `${ms.length} state${ms.length>1?"s":""}` +
+        seasonNote, true) +
+    put("CV RMSE", rmse.toFixed(2), one?"leave-one-year-out":"mean of states", true) +
+    put("80% coverage", (cvg*100).toFixed(1)+"%",
+        cvg<.8?"below nominal — overconfident":"at nominal", true);
+  const under = ms.filter(m => (m.cv_coverage_80||1) < .78).length;
+  $("#banner").innerHTML = under
+    ? `<div class="warn"><strong>Intervals are narrow.</strong> ${under} of ${ms.length}
+       state model${ms.length>1?"s":""} cover under 78% against a nominal 80%. Downside is
+       understated; read the worst-year column rather than the average when sizing tail
+       risk.</div>` : "";
+}
+
+/* Side-by-side model vs NASS for every state, scored on the in-season model so
+   the two numbers describe the same season. Computed here rather than read from
+   the index because the model figure has to be acre-weighted and calibrated. */
+function modelStateFigure(m){
+  const cs = m.current_season;
+  if(!cs || !cs.observed) return null;
+  const rows = [];
+  for(const c of m.counties){
+    const r = scoreCounty(m, c, "__CUR__");
+    if(r){ r.cal = (m.state_calibration||{}).ratio || 1; rows.push(r); }
+  }
+  if(!rows.length) return null;
+  return stateFigure(rows).wtd;
+}
+
+/* Sorting state for the per-state table, kept separate from the county table's
+   so the two do not fight over one key. Default is ascending RMSE, which is how
+   it read before it became sortable. */
+let sSortKey = "cv_rmse", sSortDir = 1;
+
+/* modelStateFigure scores every county in a state, so calling it once per row
+   on every render is 14 x ~90 county scorings for a redraw that may only have
+   changed the map colour. Cached per crop+state+season; the season is part of
+   the key because the in-season and historical paths give different numbers. */
+const _msfCache = new Map();
+function modelStateFigureCached(m){
+  const k = `${cropKey()}|${m.state}|${$("#year").value}`;
+  if(!_msfCache.has(k)) _msfCache.set(k, modelStateFigure(m));
+  return _msfCache.get(k);
+}
+
+function stateTable(){
+  const idx = (DOC.index||[]).filter(r => r.crop === cropKey());
+  const S = cropBlock().states;
+
+  const rows = idx.map(r => {
+    const m = S[r.state];
+    const mv = modelStateFigureCached(m);
+    const nv = (m.nass_forecast||{}).yield_bu;
+    return {
+      state_name: r.state_name, state: r.state,
+      counties: r.counties, cv_rmse: r.cv_rmse,
+      cv_coverage_80: r.cv_coverage_80,
+      model: mv, nass: nv,
+      gap: (mv != null && nv != null) ? mv - nv : null,
+      variant: r.irrigation ? "+irr" : "base",
+    };
+  });
+
+  // Nulls sort to the bottom whichever way the column is pointing, so an
+  // absent NASS figure never displaces a real one from the top.
+  rows.sort((a, b) => {
+    const x = a[sSortKey], y = b[sSortKey];
+    if(x == null && y == null) return 0;
+    if(x == null) return 1;
+    if(y == null) return -1;
+    if(typeof x === "string") return x.localeCompare(y) * sSortDir;
+    return (x - y) * sSortDir;
+  });
+
+  const cols = [["state_name","State"],["counties","Cty"],["cv_rmse","RMSE"],
+    ["cv_coverage_80","Cover"],["model","Model 2026"],["nass","NASS"],
+    ["gap","Diff"],["variant","Model"]];
+
+  $("#stateTbl").innerHTML = "<thead><tr>" + cols.map(([k,l]) =>
+      `<th data-k="${k}">${l}${sSortKey===k?(sSortDir>0?" ▲":" ▼"):""}</th>`).join("") +
+    "</tr></thead><tbody>" + rows.map(r => `<tr>
+      <td>${r.state_name}</td>
+      <td class="num">${r.counties}</td>
+      <td class="num">${r.cv_rmse.toFixed(2)}</td>
+      <td class="num">${(r.cv_coverage_80*100).toFixed(1)}%</td>
+      <td class="num">${r.model!=null?r.model.toFixed(1):"—"}</td>
+      <td class="num">${r.nass!=null?r.nass.toFixed(1):"—"}</td>
+      <td class="num" style="color:${r.gap==null?"var(--muted)":(Math.abs(r.gap)>10?"var(--neg)":"var(--muted)")}">${
+        r.gap==null?"—":(r.gap>0?"+":"")+r.gap.toFixed(1)}</td>
+      <td>${r.variant}</td></tr>`).join("") + "</tbody>";
+
+  $("#stateTbl").querySelectorAll("th").forEach(th => th.onclick = () => {
+    const k = th.dataset.k;
+    // First click on a new column: ascending for names, descending for numbers,
+    // which is the useful direction in each case.
+    if(k === sSortKey) sSortDir *= -1;
+    else { sSortKey = k; sSortDir = (k === "state_name" || k === "variant") ? 1 : -1; }
+    stateTable();
+  });
+}
+
+function map(rows, mode){
+  const svg = $("#map");
+  if(!GEO){ svg.innerHTML=""; $("#mapNote").textContent =
+    "No geometry in this file — rebuild with `agrefm combine`."; return; }
+  const key = {yield:"pred", anom:"anom", margin:"margin", acres:"acres"}[mode];
+  const div = (mode === "anom" || mode === "margin");
+  const sc = scaleFor(rows.map(r=>r[key]));
+  const by = new Map(rows.map(r=>[r.fips, r]));
+  const single = scopeKey() !== "__ALL__";
+
+  // Zoom: a single state uses its own bounding box, EXPANDED to the national
+  // aspect ratio first. The <svg> has height:auto, so its rendered height
+  // follows the viewBox aspect -- feeding it a raw state bbox made the canvas
+  // change shape per state, and tall narrow Illinois came out far bigger than
+  // the rest. Padding the short side keeps every map the same size and simply
+  // centres the state inside it.
+  const nat = GEO.viewBox, aspect = nat[2] / nat[3];
+  let vb = nat;
+  if(single && GEO.bbox && GEO.bbox[scopeKey()]){
+    let [x, y, w, h] = GEO.bbox[scopeKey()];
+    if(w / h < aspect){ const nw = h * aspect; x -= (nw - w) / 2; w = nw; }
+    else               { const nh = w / aspect; y -= (nh - h) / 2; h = nh; }
+    vb = [x, y, w, h];
+  }
+  // 3dp, not 1: rounding the derived box to a tenth left the aspect ratios
+  // differing in the 4th decimal between states, which is invisible but means
+  // the canvas heights are not bit-identical.
+  svg.setAttribute("viewBox", vb.map(v => +v.toFixed(3)).join(" "));
+
+  // Stroke widths are in user units, so they must scale with the zoom or a
+  // zoomed-in state gets hairlines and a national view gets slabs.
+  const z = vb[2] / GEO.viewBox[2];
+  let d = "";
+  for(const [fips, path] of Object.entries(GEO.paths)){
+    const r = by.get(fips);
+    if(single && fips.slice(0,2) !== stateFips(scopeKey())) continue;
+    d += `<path class="cty" d="${path}" data-f="${fips}" stroke-width="${(.4*z).toFixed(3)}"
+      fill="${r ? colour(r[key], sc, div) : "rgba(127,127,127,.13)"}"></path>`;
+  }
+  for(const [st, path] of Object.entries(GEO.states||{})){
+    if(single && st !== scopeKey()) continue;
+    d += `<path class="stateline" d="${path}" stroke-width="${(1.9*z).toFixed(3)}"></path>`;
+  }
+  svg.innerHTML = d;
+
+  $("#mapTitle").textContent = {yield:"predicted yield", anom:"anomaly vs trend",
+    margin:"margin vs guarantee", acres:"harvested acres"}[mode];
+  const unit = mode === "acres" ? "ac" : cropBlock().unit;
+  const dp = mode === "acres" ? 0 : 1;
+  $("#legend").innerHTML = RAMP.map(c=>`<i style="background:${c}"></i>`).join("") +
+    (sc?`<span style="margin-left:8px">${sc.lo.toFixed(dp)} → ${sc.hi.toFixed(dp)} ${unit}</span>`:"");
+  $("#mapNote").textContent = single
+    ? `${scopeKey()} only — the map is zoomed to the state.`
+    : "Grey counties sit inside the footprint but carry no model, usually because NASS published no yield for them in 2000–2025.";
+
+  const tip = $("#tip");
+  svg.onmousemove = e => {
+    const t = e.target.closest("path.cty");
+    const r = t && by.get(t.dataset.f);
+    if(!r){ tip.style.opacity = 0; return; }
+    tip.innerHTML = `<strong>${r.name||r.fips}</strong> <span class="pill">${r.state}</span><br>
+      predicted <b>${r.pred.toFixed(1)}</b> ${cropBlock().unit}<br>
+      trend ${r.trend.toFixed(1)} · anomaly ${r.anom>0?"+":""}${r.anom.toFixed(1)}<br>
+      ${r.q10!=null?`80% interval ${r.q10.toFixed(0)}–${r.q90.toFixed(0)}<br>`:""}
+      ${r.acres?`${Math.round(r.acres).toLocaleString()} ac`:""}`;
+    tip.style.opacity = 1;
+    tip.style.left = Math.min(e.clientX+14, innerWidth-285) + "px";
+    tip.style.top = (e.clientY+14) + "px";
+  };
+  svg.onmouseleave = () => tip.style.opacity = 0;
+}
+function stateFips(alpha){
+  const m = {IL:"17",IA:"19",NE:"31",ND:"38",SD:"46",KS:"20",MN:"27",MO:"29",
+             WI:"55",MI:"26",IN:"18",OH:"39",TN:"47",KY:"21"};
+  if(m[alpha]) return m[alpha];
+  const st = cropBlock().states[alpha];
+  const c = st && st.counties && st.counties[0];
+  return c ? c.fips.slice(0,2) : "";
+}
+
+let sortKey = "pred", sortDir = -1;
+function countyTable(rows){
+  const q = $("#search").value.trim().toLowerCase();
+  let r = q ? rows.filter(x => (x.name||"").toLowerCase().includes(q) || x.fips.includes(q))
+            : rows;
+  r = r.slice().sort((a,b)=>(a[sortKey] > b[sortKey] ? 1 : -1)*sortDir);
+  const cols = [["name","County"],["state","St"],["fips","FIPS"],["trend","Trend"],
+    ["pred","Predicted"],["anom","Anomaly"],["q10","q10"],["q90","q90"],
+    ["guarantee","Guarantee"],["margin","Margin"],["acres","Acres"],["nYears","Yrs"]];
+  $("#ctyTbl").innerHTML = "<thead><tr>" + cols.map(([k,l]) =>
+      `<th data-k="${k}">${l}${sortKey===k?(sortDir>0?" ▲":" ▼"):""}</th>`).join("") +
+    "</tr></thead><tbody>" + r.slice(0,600).map(x=>`<tr>
+      <td>${x.name||"—"}</td><td>${x.state}</td><td class="num">${x.fips}</td>
+      <td class="num">${x.trend.toFixed(1)}</td>
+      <td class="num"><b>${x.pred.toFixed(1)}</b></td>
+      <td class="num" style="color:${x.anom<0?"var(--neg)":"var(--pos)"}">${
+        x.anom>0?"+":""}${x.anom.toFixed(1)}</td>
+      <td class="num">${x.q10!=null?x.q10.toFixed(0):"—"}</td>
+      <td class="num">${x.q90!=null?x.q90.toFixed(0):"—"}</td>
+      <td class="num">${x.guarantee.toFixed(1)}</td>
+      <td class="num" style="color:${x.margin<0?"var(--neg)":"var(--muted)"}">${
+        x.margin>0?"+":""}${x.margin.toFixed(1)}</td>
+      <td class="num">${x.acres?Math.round(x.acres).toLocaleString():"—"}</td>
+      <td class="num">${x.nYears??"—"}</td></tr>`).join("") + "</tbody>";
+  $("#rowCount").textContent = `${r.length} counties` +
+    (r.length>600?" (first 600 shown)":"");
+  $("#ctyTbl").querySelectorAll("th").forEach(th => th.onclick = () => {
+    const k = th.dataset.k;
+    if(k === sortKey) sortDir *= -1; else { sortKey = k; sortDir = -1; }
+    render();
+  });
+}
+
+function modelCard(){
+  const ms = modelsInScope();
+  if(ms.length !== 1){
+    $("#coefTbl").innerHTML = "";
+    $("#modelNote").textContent =
+      "Select a single state — each has its own selected feature set.";
+    return;
+  }
+  const m = ms[0], inS = $("#year").value === "__CUR__" && m.current_season;
+  const src = inS ? m.current_season : m;
+  const rows = src.features.map(f => ({f, c:src.coef[f],
+      sd:(inS?src.feature_sd:m.feature_sd)[f]}))
+    .sort((a,b)=>Math.abs(b.c)-Math.abs(a.c));
+  $("#coefTbl").innerHTML = `<thead><tr><th>Feature</th><th>${cropBlock().unit} per SD</th>
+      <th>Feature SD</th></tr></thead><tbody>` + rows.map(r=>`<tr>
+      <td><code>${r.f}</code></td>
+      <td class="num" style="color:${r.c<0?"var(--neg)":"var(--pos)"}">${
+        r.c>0?"+":""}${r.c.toFixed(2)}</td>
+      <td class="num">${r.sd!=null?r.sd.toFixed(3):"—"}</td></tr>`).join("") + "</tbody>";
+  const sv = m.state_validation||{}, ir = m.irrigation, cs = m.current_season;
+  $("#modelNote").innerHTML =
+    (inS ? (cs.season_complete
+       ? `<strong>Full season scored.</strong> This crop's season closed at DOY
+          ${cs.season_end_doy}, before the ${cs.as_of_doy} (${cs.as_of_date}) as-of date,
+          so the features are complete rather than truncated and this is a scored
+          season rather than a forecast of one still running. Leave-one-year-out RMSE
+          ${cs.rmse.toFixed(2)} against ${m.cv_rmse.toFixed(2)}.<br>`
+       : `<strong>In-season model</strong>, refit on features truncated at DOY
+          ${cs.as_of_doy} (${cs.as_of_date}) so today is comparable with its own training
+          data. Leave-one-year-out RMSE ${cs.rmse.toFixed(2)} against
+          ${m.cv_rmse.toFixed(2)} for the full season.<br>`)
+     : `Ridge α ${m.ridge_alpha} · trained ${m.years_trained[0]}–${m.years_trained[1]} ·
+        variant <code>${m.variant}</code>.<br>`) +
+    `County RMSE ${m.cv_rmse.toFixed(2)}, state ${sv.state_rmse?sv.state_rmse.toFixed(2):"—"},
+     implied error correlation ρ ${sv.implied_error_corr!=null?sv.implied_error_corr.toFixed(2):"—"}.
+     ${ir?`<br>Irrigation covariate active — mean fraction ${ir.mean_fraction.toFixed(3)},
+       ${ir.counties_over_50pct} counties above 50%. Only ${(ir.by_source&&ir.by_source.census)||0}
+       of ${Object.values(ir.by_source||{}).reduce((a,b)=>a+b,0)} county-years are directly
+       observed; the rest are interpolated or carried between census years.`:""}
+     <br><em>Coefficients are collinear and should not be read individually.</em>`;
+}
+
+function loss(rows, cov){
+  const ECO = 0.86, eco = cov >= 0.90;
+  let w = 0, indem = 0, den = 0, trig = 0;
+  for(const r of rows){
+    const a = r.acres || 1;
+    const band = eco ? (cov-ECO)*r.trend : r.guarantee;
+    const short = Math.max(0, -r.margin);
+    indem += (eco ? Math.min(band, short) : short) * a;
+    den += band * a; w += a;
+    if(r.margin < 0) trig++;
+  }
+  $("#loss").innerHTML = `<div class="cards" style="margin:0">
+      <div class="card"><div class="k">Triggering</div><div class="v">${trig}</div>
+        <div class="n">of ${rows.length} counties</div></div>
+      <div class="card"><div class="k">Loss cost ratio</div>
+        <div class="v">${(den>0?indem/den:0).toFixed(4)}</div>
+        <div class="n">${eco?`ECO band ${(cov*100)|0}%–86%`:`shortfall below ${(cov*100)|0}%`}</div></div>
+      <div class="card plain"><div class="k">Indemnity</div>
+        <div class="v">${(indem/Math.max(w,1)).toFixed(2)}</div>
+        <div class="n">${cropBlock().unit}, acre-weighted</div></div>
+    </div>`;
+}
+</script>
