@@ -107,13 +107,23 @@
 
 <div class="wrap">
   <div id="loader" class="drop">
+    <p style="margin:0 0 12px" id="load-msg"><strong>Loading model_all_crops.json from GitHub...</strong></p>
+    <div id="fallback" hidden>
+      <p style="margin:0 0 12px; color: var(--neg)"><strong>Failed to load from GitHub.</strong></p>
+      <input type="file" id="file" accept=".json">
+    </div>
+    <p class="note" style="margin-top:14px">Built by <code>python -m agrefm combine --crops CORN,SOYBEANS</code>. Everything runs locally.</p>
+  </div>
+<!--
+<div class="wrap">
+  <div id="loader" class="drop">
     <p style="margin:0 0 12px"><strong>Drop <code>model_all_crops.json</code> here</strong>, or choose the file.</p>
     <input type="file" id="file" accept=".json">
     <p class="note" style="margin-top:14px">Built by
       <code>python -m agrefm combine --crops CORN,SOYBEANS</code>. Everything runs locally;
       nothing is uploaded.</p>
   </div>
-
+-->
   <div id="app" hidden>
     <div class="bar">
       <label>Crop <select id="crop"></select></label>
@@ -208,6 +218,9 @@ try{
 }catch(e){}
 
 /* ---------- load ---------- */
+// IMPORTANT: Replace this with your actual RAW GitHub URL
+const GITHUB_DATA_URL = "https://raw.githubusercontent.com/jianweixie/Ag_Re_FM/main/model_all_crops.json";
+
 function boot(text){
   let d;
   try{ d = JSON.parse(text); }
@@ -220,16 +233,37 @@ function boot(text){
   $("#loader").hidden = true; $("#app").hidden = false;
   onCrop();
 }
+
+async function loadFromGitHub() {
+  try {
+    const response = await fetch(GITHUB_DATA_URL);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const text = await response.text();
+    boot(text);
+  } catch (error) {
+    console.error("Fetch error:", error);
+    $("#load-msg").hidden = true;
+    $("#fallback").hidden = false;
+  }
+}
+
+// Execute fetch on load
+loadFromGitHub();
+
+// Fallback manual upload if GitHub fetch fails
 $("#file").addEventListener("change", e => {
   const f = e.target.files[0]; if(!f) return;
   const r = new FileReader(); r.onload = () => boot(r.result); r.readAsText(f);
 });
+
 const drop = $("#loader");
 ["dragenter","dragover"].forEach(t => drop.addEventListener(t, e => {
   e.preventDefault(); drop.classList.add("hot"); }));
 ["dragleave","drop"].forEach(t => drop.addEventListener(t, e => {
   e.preventDefault(); drop.classList.remove("hot"); }));
 drop.addEventListener("drop", e => {
+  e.preventDefault();
+  drop.classList.remove("hot");
   const f = e.dataTransfer.files[0]; if(!f) return;
   const r = new FileReader(); r.onload = () => boot(r.result); r.readAsText(f);
 });
